@@ -1,5 +1,5 @@
 use bytemuck::{Pod, Zeroable};
-use std::sync::Arc;
+use std::{fs::File, io::Read, sync::Arc};
 use vulkano::{
     buffer::{BufferUsage, CpuAccessibleBuffer},
     command_buffer::{
@@ -22,12 +22,14 @@ use vulkano::{
         GraphicsPipeline,
     },
     render_pass::{Framebuffer, FramebufferCreateInfo, RenderPass, Subpass},
+    shader::ShaderModule,
     single_pass_renderpass,
     swapchain::{acquire_next_image, Surface, Swapchain, SwapchainCreateInfo},
     sync::{now, GpuFuture},
 };
 use vulkano_win::{required_extensions, VkSurfaceBuild};
 use winit::{
+    dpi::LogicalSize,
     event::{ElementState, Event, MouseButton, WindowEvent},
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
@@ -45,6 +47,7 @@ fn create_instance() -> Arc<Instance> {
 fn create_surface(instance: Arc<Instance>, event_loop: &EventLoop<()>) -> Arc<Surface<Window>> {
     WindowBuilder::new()
         .with_title("My Vulkan Window")
+        .with_inner_size(LogicalSize::new(1280, 720))
         .build_vk_surface(event_loop, instance)
         .expect("Unable to create window")
 }
@@ -112,7 +115,7 @@ fn create_render_pass(device: Arc<Device>) -> Arc<RenderPass> {
                                     load: Clear,
                                     store: DontCare,
                                     format: Format::B8G8R8A8_UNORM,
-                                    samples: 4,
+                                    samples: 8,
                                 },
                                 output: {
                                     load: Clear,
@@ -127,7 +130,7 @@ fn create_render_pass(device: Arc<Device>) -> Arc<RenderPass> {
                                 resolve: [output],
                             }
     )
-    .unwrap()
+    .expect("Could not create render pass")
 }
 
 fn create_graphics_pipeline(
@@ -151,16 +154,16 @@ fn create_graphics_pipeline(
                     "
         }
     }
-    mod fragment_shader {
-        vulkano_shaders::shader! {
-            ty: "fragment",
-            path: "shader.frag"
-        }
-    }
     let vertex_shader_module =
         vertex_shader::load(device.clone()).expect("Could not load vertex shader");
+    let mut fragment_shader_bytes = Vec::new();
+    File::open("frag.spv")
+        .expect("Could not find fragment shader spv file")
+        .read_to_end(&mut fragment_shader_bytes)
+        .expect("Could not read fragment shader spv file");
     let fragment_shader_module =
-        fragment_shader::load(device.clone()).expect("Could not load fragment shader");
+        unsafe { ShaderModule::from_bytes(device.clone(), &fragment_shader_bytes[..]) }
+            .expect("Could not load fragment shader module");
     let viewport = Viewport {
         origin: [0.0, 0.0],
         dimensions: [swapchain_extent[0] as f32, swapchain_extent[1] as f32],
@@ -200,7 +203,7 @@ fn create_frame_buffers(
     let color_image = AttachmentImage::multisampled(
         device.clone(),
         dimenstions,
-        SampleCount::Sample4,
+        SampleCount::Sample8,
         Format::B8G8R8A8_UNORM,
     )
     .expect("Could not create color image");
