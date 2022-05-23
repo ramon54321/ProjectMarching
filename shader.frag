@@ -18,28 +18,6 @@ float getDist(vec3 point)
     return dist;
 }
 
-vec3 getNormal(vec3 point)
-{
-    float pointDistance = getDist(point);
-    vec2 sampleOffset = vec2(0.01, 0.0);
-    vec3 normal = pointDistance - vec3(
-        getDist(point - sampleOffset.xyy),
-        getDist(point - sampleOffset.yxy),
-        getDist(point - sampleOffset.yyx)
-    );
-    return normalize(normal);
-}
-
-float getLight(vec3 point)
-{
-    vec3 lightPosition = vec3(2.5, 5.0, -1.0);
-    vec3 directionToLight = normalize(lightPosition - point);
-    vec3 surfaceNormal = getNormal(point);
-
-    float diffuseLight = dot(surfaceNormal, directionToLight);
-    return diffuseLight;
-}
-
 float rayMarch(vec3 rayOrigin, vec3 rayDirection)
 {
     float distanceOrigin = 0.0;
@@ -55,6 +33,36 @@ float rayMarch(vec3 rayOrigin, vec3 rayDirection)
     return distanceOrigin;
 }
 
+vec3 getNormal(vec3 point)
+{
+    float pointDistance = getDist(point);
+    vec2 sampleOffset = vec2(0.01, 0.0);
+    vec3 normal = pointDistance - vec3(
+        getDist(point - sampleOffset.xyy),
+        getDist(point - sampleOffset.yxy),
+        getDist(point - sampleOffset.yyx)
+    );
+    return normalize(normal);
+}
+
+vec3 getLight(vec3 point)
+{
+    vec3 lightPosition = vec3(2.5, 5.0, -1.0);
+    vec3 directionToLight = normalize(lightPosition - point);
+    vec3 surfaceNormal = getNormal(point);
+    vec3 diffuseLight = vec3(dot(surfaceNormal, directionToLight));
+
+    float distanceToLight = length(lightPosition - point);
+    float distanceToHitTowardsLight = rayMarch(point + directionToLight * 0.04, directionToLight);
+
+    if (distanceToHitTowardsLight < distanceToLight) {
+	diffuseLight *= 0.1;
+    }
+
+    vec3 ambientLight = vec3(0.15, 0.05, 0.1) * 1.0;
+
+    return ambientLight + diffuseLight;
+}
 
 void main()
 {
@@ -68,8 +76,8 @@ void main()
     //float diffuseLight = getNormal(hitPoint);
     
     //vec3 color = vec3(diffuseLight);
-    float lightIntensity = getLight(hitPoint);
-    vec3 color = vec3(lightIntensity);
+    vec3 light = getLight(hitPoint);
+    vec3 color = light; 
 
     outColor = vec4(color, 1.0);
 }
